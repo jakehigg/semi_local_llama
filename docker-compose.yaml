@@ -1,0 +1,52 @@
+services:
+  semi_local_llama:
+    build:
+      context: ./semi_local_llama/.
+    # Uncomment if you want to expose Ollama to your internal network
+    # ports:
+    #   - "11435:80"
+    volumes:
+      - ~/.aws:/root/.aws
+      - ./semi_local_llama/terraform:/terraform
+    profiles:
+      - ollama
+    environment:
+      - TF_VAR_aws_region=us-east-1
+      - TF_VAR_ollama_instance_type=c8g.4xlarge
+      - TF_VAR_ollama_instance_ami=ami-0eae2a0fc13b15fce
+      - TF_VAR_ollama_instance_subnet=subnet-deafbeef
+      - TF_VAR_ollama_instance_vpc=vpc-deadbeef
+      - TF_VAR_sns_notification_arn=arn:aws:sns:us-east-1:12345678:monitor-topic
+      - TF_VAR_ollama_pull_model=qwen2.5-coder:7b
+
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    # Uncomment if you want to expose an unauthenticated OpenWebUI
+    # ports:
+    #   - 3000:8080
+    volumes:
+      - open-webui:/app/backend/data
+    depends_on:
+      - semi_local_llama
+    profiles:
+      - ollama
+    environment:
+      - WEBUI_AUTH="false"
+      - OLLAMA_BASE_URL=http://semi_local_llama:80
+
+
+  cleanup:
+    image: hashicorp/terraform:latest
+    volumes:
+      - ./semi_local_llama/terraform:/workspace
+      - ~/.aws:/root/.aws
+    working_dir: /workspace
+    profiles:
+      - cleanup
+    command: ["destroy", "-auto-approve"]
+
+
+volumes:
+  open-webui:
+
